@@ -24,3 +24,4 @@
 !node_modules/@vscode/codicons/LICENSE-CODE
 !node_modules/@vscode/codicons/dist/codicon.css
 !node_modules/@vscode/codicons/dist/codicon.ttf
+!mcp/dist/**

@@ -50,6 +50,9 @@ written under one file lock.
 | `viewer_state()` | Every PDF open in a VS Code tab as an entry `{viewer, window, path, page, pages, active}`, the active one first (C1) |
 | `get_selection(source="primary")` | `primary`: the text selected in the active PDF tab, with its `path` and the `page` the selection starts on, plus `tex` (`[{file, lines: [first, last]}]`, one entry per source file) when the PDF has SyncTeX data; `""` when nothing is selected. `clipboard`: the system clipboard, unattributed (C2) |
 | `goto(page, path=None)` | Shows `page` of `path` (default: the active document), opening it in VS Code if no tab has it; returns the entry after the move (C3). Only when the user asks to be shown a place |
+| `pdf_info(path=None)` | Page count, title, author and the outline with page numbers of `path` (default: the active document). Kvant fork |
+| `read_pdf_text(path=None, from_page=1, to_page=None)` | Text of pages `from_page`..`to_page`; without `to_page` 20 pages, `next_page` says where to continue. Kvant fork |
+| `search_pdf(query, path=None, max_matches=50)` | Pages containing `query` (case-insensitive) with snippets; `matches_total` counts all. Kvant fork |
 
 The **active entry** is the active PDF tab of the most recently focused VS Code window or,
 if no window has a PDF tab as its active editor, the PDF tab that was active most recently.

@@ -70,10 +70,10 @@ after(async () => {
   fs.rmSync(docDir, { recursive: true, force: true });
 });
 
-test("C4: the server offers viewer_state, get_selection and goto only (no reload, no writing)", async () => {
+test("C4: the server offers the viewer tools and the read-only content tools (no reload, no writing)", async () => {
   const { tools } = await client.listTools();
   const byName = Object.fromEntries(tools.map((t) => [t.name, t]));
-  assert.deepEqual(Object.keys(byName).sort(), ["get_selection", "goto", "viewer_state"]);
+  assert.deepEqual(Object.keys(byName).sort(), ["get_selection", "goto", "pdf_info", "read_pdf_text", "search_pdf", "viewer_state"]);
   assert.equal(byName.viewer_state.title, "VS Code PDF: open documents and pages");
   assert.equal(byName.get_selection.title, "VS Code PDF: selection");
   assert.equal(byName.goto.title, "VS Code PDF: show a page to the user");
@@ -89,12 +89,12 @@ test("C4: the tools are exactly the README's tool table, with the contract's hin
   const { tools } = await client.listTools();
   assert.deepEqual(tools.map((t) => t.name).sort(), documented);
   const hints = Object.fromEntries(tools.map((t) => [t.name, t.annotations || {}]));
-  assert.deepEqual(Object.keys(hints).filter((n) => hints[n].readOnlyHint).sort(), ["get_selection", "viewer_state"]);
+  assert.deepEqual(Object.keys(hints).filter((n) => hints[n].readOnlyHint).sort(), ["get_selection", "pdf_info", "read_pdf_text", "search_pdf", "viewer_state"]);
   assert.equal(hints.goto.destructiveHint, false);
   assert.equal(hints.goto.idempotentHint, true);
 });
 
-test("C4: the server and the hook load no PDF library (they never read or write PDF content)", () => {
+test("C4: loading the server and the hook loads no PDF library (pdf.js comes in only on a content call)", () => {
   const code = 'require("./mcp/server.js"); require("./lib/hook"); require("./bin/open.js");'
     + 'console.log(JSON.stringify(Object.keys(require.cache).filter((k) => /pdfjs|pdf-lib|pymupdf/i.test(k))))';
   const out = spawnSync(process.execPath, ["-e", code], { cwd: path.resolve(__dirname, ".."), encoding: "utf8" });
@@ -102,10 +102,10 @@ test("C4: the server and the hook load no PDF library (they never read or write 
   assert.deepEqual(JSON.parse(out.stdout), []);
 });
 
-test("mcp: server name and instructions (pairs with pdf-reader-writer-mcp; goto only on request)", () => {
+test("mcp: server name and instructions (names the content tools; goto only on request)", () => {
   assert.equal(client.getServerVersion()?.name, "vscode-pdf");
   const instructions = client.getInstructions() || "";
-  assert.match(instructions, /pdf-reader-writer-mcp/);
+  assert.match(instructions, /read_pdf_text/);
   assert.match(instructions, /goto\s+only when the user asks/);
 });
 

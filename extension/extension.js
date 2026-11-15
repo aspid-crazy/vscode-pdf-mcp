@@ -26,7 +26,7 @@ const { SourceSync, changedFiles, sourcesAmong } = require("./sourcesync");
 const { SynctexStore, pdfCandidatesForTex, sourceLine, sourceLines, snippet } = require("./synctexstore");
 const ipc = require("./ipc");
 const { renderHtml, nonce } = require("./html");
-const { stateDir } = require("../lib/runtime");
+const { stateDir, socketPath } = require("../lib/runtime");
 const { isAlive, realPath, NO_WINDOW } = require("../lib/backend");
 
 const VIEW_TYPE = "vscodePdfMcp.viewer";
@@ -911,9 +911,23 @@ async function activate(context) {
   }
   removeStale(dir, pid);
   const file = path.join(dir, `${pid}.json`);
-  const socket = path.join(dir, `${pid}.sock`);
+  const socket = socketPath(dir, pid);
   const store = new StateStore({ pid, socket, file, onError: (e) => trace(`state write failed: ${e}`) });
   const viewer = new Viewer(context, store, pid);
+
+  // Kvant fork: offer the bundled MCP server to the editor's chat agents. Registered
+  // before the first await, since the editor may activate us just for this provider.
+  if (vscode.lm?.registerMcpServerDefinitionProvider) {
+    context.subscriptions.push(vscode.lm.registerMcpServerDefinitionProvider("vscodePdfMcp.server", {
+      provideMcpServerDefinitions: () => [new vscode.McpStdioServerDefinition(
+        "PDF",
+        process.execPath,
+        [path.join(context.extensionPath, "mcp", "dist", "server.js")],
+        { ELECTRON_RUN_AS_NODE: "1", VSCODE_PDF_MCP_DIR: dir },
+        context.extension.packageJSON.version,
+      )],
+    }));
+  }
 
   const folders = () => (vscode.workspace.workspaceFolders || [])
     .filter((f) => f.uri.scheme === "file").map((f) => f.uri.fsPath);

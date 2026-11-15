@@ -11,13 +11,14 @@ const { McpServer } = require("@modelcontextprotocol/sdk/server/mcp.js");
 const { StdioServerTransport } = require("@modelcontextprotocol/sdk/server/stdio.js");
 const { z } = require("zod");
 const backend = require("../lib/backend");
+const pdftext = require("../lib/pdftext");
 const { ensureSessionEnv, stateDir } = require("../lib/runtime");
 
 const INSTRUCTIONS =
   "VS Code PDF viewer bridge. viewer_state tells you which PDF the user is reading in a VS Code " +
   "tab and on which page (the active entry first); get_selection returns the text they selected " +
-  "in the viewer, with its document and page. This server does not read or write PDF content: " +
-  "pair it with pdf-reader-writer-mcp, which takes the path and page reported here. Use goto " +
+  "in the viewer, with its document and page. pdf_info, read_pdf_text and search_pdf read a " +
+  "PDF's outline, page text and matches, the active one when no path is given. Use goto " +
   "only when the user asks to be shown a place. The viewer re-renders by itself when the file " +
   "changes on disk, and it has no unsaved state.";
 
@@ -102,6 +103,81 @@ function createServer({ dir, timeoutMs } = {}) {
     async ({ page, path }) => {
       try {
         return ok(await backend.goto(page, path, { dir: where(), timeoutMs }));
+      } catch (e) {
+        return fail(e);
+      }
+    });
+
+  /**
+   * Kvant fork: the document a content tool works on — `path` as given, else the PDF
+   * active in the viewer.
+   * @param {string | null | undefined} path
+   */
+  const docPath = (path) => {
+    if (path) return path;
+    const active = backend.viewerState({ dir: where() })[0];
+    if (!active?.path) throw new Error("no path given and no PDF is open in the viewer");
+    return active.path;
+  };
+
+  server.registerTool(
+    "pdf_info",
+    {
+      title: "PDF: document info",
+      description:
+        "Page count, title, author and the table of contents (outline entries with their pages) " +
+        "of a PDF. `path` is absolute; without it, the PDF active in the viewer.",
+      inputSchema: { path: z.string().nullable().optional().describe("absolute path of the PDF (default: the active one)") },
+      annotations: { readOnlyHint: true },
+    },
+    async ({ path }) => {
+      try {
+        return ok(await pdftext.info(docPath(path)));
+      } catch (e) {
+        return fail(e);
+      }
+    });
+
+  server.registerTool(
+    "read_pdf_text",
+    {
+      title: "PDF: page text",
+      description:
+        "Text of PDF pages from_page..to_page (1-based, inclusive). Without to_page, " +
+        `${pdftext.DEFAULT_PAGE_SPAN} pages; next_page is where the following call starts ` +
+        "(null at the end). Scanned pages without a text layer come back empty.",
+      inputSchema: {
+        path: z.string().nullable().optional().describe("absolute path of the PDF (default: the active one)"),
+        from_page: z.number().int().optional().describe("first page, 1-based (default 1)"),
+        to_page: z.number().int().optional().describe("last page, inclusive; the last page of the document reads it all"),
+      },
+      annotations: { readOnlyHint: true },
+    },
+    async ({ path, from_page, to_page }) => {
+      try {
+        return ok(await pdftext.readText(docPath(path), from_page ?? 1, to_page));
+      } catch (e) {
+        return fail(e);
+      }
+    });
+
+  server.registerTool(
+    "search_pdf",
+    {
+      title: "PDF: search",
+      description:
+        "Pages of a PDF whose text contains `query` (case-insensitive), with a snippet around each " +
+        "match. matches_total counts every match; up to max_matches (default 50) are listed.",
+      inputSchema: {
+        query: z.string().describe("text to find"),
+        path: z.string().nullable().optional().describe("absolute path of the PDF (default: the active one)"),
+        max_matches: z.number().int().optional().describe("how many matches to list (default 50)"),
+      },
+      annotations: { readOnlyHint: true },
+    },
+    async ({ query, path, max_matches }) => {
+      try {
+        return ok(await pdftext.search(docPath(path), query, max_matches ?? 50));
       } catch (e) {
         return fail(e);
       }
