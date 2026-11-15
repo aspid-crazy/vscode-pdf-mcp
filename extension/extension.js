@@ -920,7 +920,7 @@ async function activate(context) {
   if (vscode.lm?.registerMcpServerDefinitionProvider) {
     context.subscriptions.push(vscode.lm.registerMcpServerDefinitionProvider("vscodePdfMcp.server", {
       provideMcpServerDefinitions: () => [new vscode.McpStdioServerDefinition(
-        "PDF",
+        "PDF Viewer",
         process.execPath,
         [path.join(context.extensionPath, "mcp", "dist", "server.js")],
         { ELECTRON_RUN_AS_NODE: "1", VSCODE_PDF_MCP_DIR: dir },
